@@ -1,8 +1,10 @@
 import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from "react-hook-form";
-import { Button, StyleSheet, TextInput, View } from 'react-native';
+import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
 
 export default function NewResponse(){
     //load necessary information about the form
@@ -139,42 +141,95 @@ export default function NewResponse(){
             }
             initForm()
         }, [id]);
+    //basic components to replicate radio buttons/checkboxes 
+    function RadioButtons( { options } ){
+        const [selected, setSelected] = useState([])
+        return(
+            <View>
+                {options.map(option => (
+                    <View key={option.id}>
+                        <Text>{option.text}</Text>
+                        <Ionicons name={selected.includes(option) ? 'radio-button-on-outline' : 'radio-button-off-outline'} 
+                        color={'red'} size={24} onPress={() => selected.includes(option) ? setSelected([]) : setSelected([option])} />
+                    </View>
+                ))}
+            </View>
+        )
+        
+    }
+    function YNButtons(){
+        const options = ['Yes', 'No']
+        const [selected, setSelected] = useState([])
+        return(
+            <View>
+                {options.map(option => (
+                    <View key={option}>
+                        <Text>{option}</Text>
+                        <Ionicons name={selected.includes(option) ? 'radio-button-on-outline' : 'radio-button-off-outline'} 
+                        color={'red'} size={24} 
+                        onPress={() => selected.includes(option) ? setSelected([]) : setSelected([option])} />
+                    </View>
+                ))}
+            </View>
+        )
+    }
+    function Checkboxes( { options } ){
+        const [selected, setSelected] = useState([])
+        return(
+            <View>
+                {options.map(option => (
+                    <View key={option.id}>
+                        <Text>{option.text}</Text>
+                        <Ionicons name={selected.includes(option) ? 'checkbox' : 'checkbox-outline'} 
+                        color={'red'} size={24} onPress={() => 
+                        selected.includes(option) ? 
+                            setSelected(selected.filter(s => s.id !== option.id)) : 
+                            option.special === 'None of the above' || option.special === 'All'? 
+                                setSelected([option]) : 
+                                selected.filter(s => s.special === 'None of the above' || s.special === 'All').length > 0 ?
+                                    setSelected([option]) : 
+                            setSelected([...selected, option])} 
+                        />
+                    </View>
+                ))}
+            </View>
+        )
+        
+    }
 
+    //standard code for handling submit
     const {control, handleSubmit, formState: { errors }, } = useForm({
         defaultValues: {firstName: "", lastName: "",},})
 
     const onSubmit = (data) => console.log(data)
 
-    return (
-        <View>
-            <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                    placeholder="First name"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
+    //return the actual form
+    if (loading) return <Text>Loading...</Text>;
+    if (!form.questions || form.questions.length === 0) return <Text>This form has no questions.</Text>;
+    if(form.questions.length > 0){
+        const questions = form.questions
+        return (
+            <ScrollView>
+                <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                        placeholder={questions[0].text}
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                    />
+                    )}
+                    name="firstName"
                 />
-                )}
-                name="firstName"
-            />
-            {errors.firstName && <Text>This is required.</Text>}
+                {errors.firstName && <Text>This is required.</Text>}
+                <YNButtons />
+                <RadioButtons options={questions[0].options} />
+                <Checkboxes options={questions[1].options} />
 
-            <Controller
-                control={control} rules={{ maxLength: 255 }}
-                render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                    placeholder="Last name"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                />
-                )}
-                name="lastName"
-            />
-            <Button title="Submit" onPress={handleSubmit(onSubmit)} />
-        </View>
-  )
+                <Button title="Submit" onPress={handleSubmit(onSubmit)} />
+            </ScrollView>
+        )
+    }
 }
 
 const styles = StyleSheet.create({
