@@ -1,10 +1,269 @@
 import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
+import { ThemedText } from '@/components/ThemedText';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Controller, useForm } from "react-hook-form";
-import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Controller, FormProvider, useForm, useFormContext, useWatch } from "react-hook-form";
+import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+    //basic components to replicate radio buttons/checkboxes 
+function RadioButtons( { question } ){
+    const { control } = useFormContext();
+    const options = question.options
+    return(
+        <Controller control={control} name={question.id.toString()} defaultValue={null}
+            render={({ field: {onChange, value}}) => {
+                const selected = value || [];
+                const toggleOption = (option) => {
+                    const isSelected = selected.id === option.id;
+                    if(isSelected){
+                        onChange([])
+                    }
+                    else{
+                        onChange([option])
+                    }}
+                    return(
+                        <View>
+                            {options.map(option => (
+                                <View key={option.id} style={styles.options}>
+                                    <TouchableOpacity onPress={() => toggleOption(option)}>
+                                        <Ionicons
+                                            name={selected.id === option.id ? 'radio-button-on-outline' : 'radio-button-off-outline'}
+                                            size={24}
+                                            color="red"
+                                        />
+                                    </TouchableOpacity>
+                                    <Text>{option.text}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )
+            }}
+        />
+    ) 
+}
+
+function YNButtons({ question }){
+    const options = ['Yes', 'No']
+    const { control } = useFormContext();
+    return(
+        <Controller control={control} name={question.id.toString()} defaultValue={[]}
+            render={({ field: {onChange, value}}) => {
+                const selected = value || [];
+                const toggleOption = (option) => {
+                    const isSelected = selected.some(s => s === option);;
+                    if(isSelected){
+                        onChange([])
+                    }
+                    else{
+                        onChange([option])
+                    }}
+                    return(
+                        <View>
+                            {options.map(option => (
+                                <View key={option} style={styles.options}>
+                                    <TouchableOpacity onPress={() => toggleOption(option)}>
+                                        <Ionicons
+                                            name={selected.some(s => s === option) ? 'radio-button-on-outline' : 'radio-button-off-outline'}
+                                            size={24}
+                                            color="red"
+                                        />
+                                    </TouchableOpacity>
+                                    <Text>{option}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )
+            }}
+        />
+    )
+}
+//need to find a way to clear this if hidden
+function Checkboxes( { question, onlyShow=null } ){
+    const { control } = useFormContext();
+    let options = question.options
+    if(Array.isArray(onlyShow) && onlyShow.some(opt => opt && typeof opt === 'object')){
+        if(onlyShow[0].special !== 'All'){
+            let osText = []
+            onlyShow.forEach(opt => osText.push(opt.text.trim().toLowerCase()))
+            options = options.filter(option => osText.includes(option.text.trim().toLowerCase()) || option.special === 'None of the above')
+
+        }
+    }
+    return(
+        <Controller control={control} name={question.id.toString()} defaultValue={[]}
+            render={({ field: {onChange, value }}) => {
+                const selected = value || [];
+                const toggleOption = (option) => {
+                const isSelected = selected.some(s => s.id === option.id);
+                const hasSpecial = selected.some(s => s.special === 'None of the above' || s.special === 'All');
+
+                if(isSelected){
+                    onChange(selected.filter(s => s.id !== option.id));
+                }
+                else if(option.special === 'None of the above' || option.special === 'All'){
+                    onChange([option])
+                }
+                else if(hasSpecial){
+                    onChange([option]);
+                }
+                else{
+                    onChange([...selected, option]);
+                }
+            }
+            return(
+                <View>
+                    {options.map(option => ( 
+                        <View key={option.id} style={styles.options}>
+                            <TouchableOpacity onPress={() => toggleOption(option)}>
+                                <Ionicons
+                                    name={selected.some(s => s.id === option.id) ? 'checkbox' : 'checkbox-outline'}
+                                    size={24}
+                                    color="red"
+                                />
+                            </TouchableOpacity>
+                            <Text>{option.text}</Text>
+                        </View>
+                    ))}
+                </View>
+            )
+        }}
+        />
+    )
+}
+
+function Question({ question }){
+    const { control } = useFormContext();
+    const watchedValues = {};
+    const rules = question.logic?.[0]?.rules || [];
+    const [selected, setSelected] = useState(null)
+    for (let rule of rules) {
+        watchedValues[rule.parent_question] = useWatch({
+            control: control,
+            name: rule.parent_question.toString(),
+        });
+    }
+
+    let show = true
+    if(rules.length > 0){
+        const logic = question.logic?.[0];
+        const operator = logic.conditional_operator;
+        const limitOptions = logic.limit_options;
+        const evaluateRule = (rule) =>{
+            let val = watchedValues[rule.parent_question];
+            console.log(val)
+            let match = false;
+            //I worry that that filter line will create a problem, but it seems to work for now, so \_''_/
+            if(typeof val === 'undefined'){
+                return match
+            }
+            if(Array.isArray(val) && val.length === 0){
+                return match
+            }
+            if (Array.isArray(val) && val.some(v => v && typeof v === 'object' && v.special === 'None of the above')){
+                return match
+            }
+            const expected = rule.expected_value;
+            const comparison = rule.value_comparison;
+            const negate = rule.negate_value;
+            if(comparison === null || comparison === 'MATCHES'){
+                if(!Array.isArray(val)){
+                    val = [val]
+                }
+                if(val.includes(expected)){
+                    match = true
+                }
+            }
+            //assume that these will always be text inputs and will return a single value
+            else if(comparison === 'CONTAINS'){
+                match = val.includes(expected) ? true : false
+            }
+            else if(comparison === 'DOES NOT CONTAIN'){
+                match = val.includes(expected) ? false : true
+            }
+            else if(comparison === 'GREATER THAN'){
+                match = val > expected ? true : false
+            }
+            else if(comparison === 'LESS THAN'){
+                match = val < expected ? true : false
+            }
+            if(limitOptions && val !== selected){
+                setSelected(val)
+            }
+            return negate ? !match : match
+        }
+        if(operator === 'AND'){
+            show = rules.every(evaluateRule)
+        }
+        if(operator === 'OR'){
+            show = rules.some(evaluateRule)
+        }
+    }
+
+    if (!show) return null;
+    
+    if(question.type === 'Text'){
+        return(
+            <View>
+                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <Controller control={control} rules={{  }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                    placeholder="Type answer here..."
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                />
+                )}
+                name={question.id.toString()}
+            />
+            </View>
+        )
+    }
+    if(question.type === 'Number'){
+        return(
+            <View>
+                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <Controller control={control} rules={{ min:0 }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                    placeholder="Type any number here..."
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                />
+                )}
+                name={question.id.toString()}
+            />
+            </View>
+        )
+    }
+    if(question.type === 'Yes/No'){
+        return(
+            <View>
+                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <YNButtons question = {question} />
+            </View>
+        )
+    }
+    if(question.type === 'Single Selection'){
+        return(
+            <View>
+                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <RadioButtons question={question} />
+            </View>
+        )
+    }
+    if(question.type === 'Multiple Selections'){
+        return(
+            <View>
+                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <Checkboxes question={question} onlyShow={selected}/>
+            </View>
+        )
+    }
+}
 
 export default function NewResponse(){
     //load necessary information about the form
@@ -141,67 +400,15 @@ export default function NewResponse(){
             }
             initForm()
         }, [id]);
-    //basic components to replicate radio buttons/checkboxes 
-    function RadioButtons( { options } ){
-        const [selected, setSelected] = useState([])
-        return(
-            <View>
-                {options.map(option => (
-                    <View key={option.id}>
-                        <Text>{option.text}</Text>
-                        <Ionicons name={selected.includes(option) ? 'radio-button-on-outline' : 'radio-button-off-outline'} 
-                        color={'red'} size={24} onPress={() => selected.includes(option) ? setSelected([]) : setSelected([option])} />
-                    </View>
-                ))}
-            </View>
-        )
-        
-    }
-    function YNButtons(){
-        const options = ['Yes', 'No']
-        const [selected, setSelected] = useState([])
-        return(
-            <View>
-                {options.map(option => (
-                    <View key={option}>
-                        <Text>{option}</Text>
-                        <Ionicons name={selected.includes(option) ? 'radio-button-on-outline' : 'radio-button-off-outline'} 
-                        color={'red'} size={24} 
-                        onPress={() => selected.includes(option) ? setSelected([]) : setSelected([option])} />
-                    </View>
-                ))}
-            </View>
-        )
-    }
-    function Checkboxes( { options } ){
-        const [selected, setSelected] = useState([])
-        return(
-            <View>
-                {options.map(option => (
-                    <View key={option.id}>
-                        <Text>{option.text}</Text>
-                        <Ionicons name={selected.includes(option) ? 'checkbox' : 'checkbox-outline'} 
-                        color={'red'} size={24} onPress={() => 
-                        selected.includes(option) ? 
-                            setSelected(selected.filter(s => s.id !== option.id)) : 
-                            option.special === 'None of the above' || option.special === 'All'? 
-                                setSelected([option]) : 
-                                selected.filter(s => s.special === 'None of the above' || s.special === 'All').length > 0 ?
-                                    setSelected([option]) : 
-                            setSelected([...selected, option])} 
-                        />
-                    </View>
-                ))}
-            </View>
-        )
-        
-    }
+
 
     //standard code for handling submit
-    const {control, handleSubmit, formState: { errors }, } = useForm({
-        defaultValues: {firstName: "", lastName: "",},})
+    const methods = useForm();
+    const { control, handleSubmit, formState: { errors } } = methods;
 
-    const onSubmit = (data) => console.log(data)
+    const onSubmit = (data) => {
+        console.log('submit', data);
+    }
 
     //return the actual form
     if (loading) return <Text>Loading...</Text>;
@@ -209,30 +416,174 @@ export default function NewResponse(){
     if(form.questions.length > 0){
         const questions = form.questions
         return (
-            <ScrollView>
-                <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                    render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                        placeholder={questions[0].text}
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value}
-                    />
-                    )}
-                    name="firstName"
-                />
-                {errors.firstName && <Text>This is required.</Text>}
-                <YNButtons />
-                <RadioButtons options={questions[0].options} />
-                <Checkboxes options={questions[1].options} />
+            <FormProvider {...methods}>
+            <ScrollView style={styles.container}>
+                <ThemedText type="title">New Response for {form.name}</ThemedText>
+                <ThemedText>{questions.length} questions (max)</ThemedText>
+                    <View>
+                        <ThemedText type="subtitle">Respondent Information</ThemedText>
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="ID or Passport Number"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="id_no"
+                        />
+                        {errors.id_no && <Text style={styles.errorText}>This field is required!</Text>}
 
-                <Button title="Submit" onPress={handleSubmit(onSubmit)} />
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="Respondent First Name"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="fname"
+                        />
+                        {errors.fname && <Text>This is required.</Text>}
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="Respondent Surname"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="lname"
+                        />
+                        {errors.lname && <Text style={styles.errorText}>This field is required!</Text>}
+
+                        <Controller control={control} rules={{ required: true, pattern: /^\d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])$/ }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="yyyy-mm-dd"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="dob"
+                        />
+                        {errors.dob && <Text style={styles.errorText}>Please enter a valid date</Text>}
+                        
+                        
+                        <Controller control={control} defaultValue="M" rules={{ required: true }}
+                            render={({ field: { onChange, value } }) => (
+                                <Picker onValueChange={onChange} selectedValue={value}>
+                                    <Picker.Item label="Male" value="M" />
+                                    <Picker.Item label="Female" value="F" />
+                                    <Picker.Item label="Non-Binary" value="NB" />
+                                </Picker>
+                            )}
+                            name="sex"
+                        />
+                        {errors.sex && <Text style={styles.errorText}>Please select an option!</Text>}
+
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="Ward"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="ward"
+                        />
+                        {errors.ward && <Text style={styles.errorText}>This field is required!</Text>}
+
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="Village"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="village"
+                        />
+                        {errors.village && <Text style={styles.errorText}>This field is required!</Text>}
+
+                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="District"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="district"
+                        />
+                        {errors.district && <Text style={styles.errorText}>This field is required!</Text>}
+
+                        <Controller control={control} rules={{ required: true, maxLength: 255}}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="Citizenship"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="citizenship"
+                        />
+                        {errors.citizenship && <Text style={styles.errorText}>This field is required!</Text>}
+
+                        <Controller control={control} rules={{ maxLength: 255, pattern: /^\S+@\S+$/i  }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="email@website.com"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="email"
+                        />
+                        {errors.email && <Text style={styles.errorText}>Please enter a valid email address.</Text>}
+
+                        <Controller control={control} rules={{ maxLength: 255, pattern: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/  }}
+                            render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                placeholder="+267 71 234 567"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                            )}
+                            name="contact_no"
+                        />
+                        {errors.contact_no && <Text style={styles.errorText}>Please enter a valid phone number</Text>}
+                    </View>
+
+                    <View>
+                        <ThemedText type="subtitle">Questions</ThemedText>
+                        {questions.map(question => (
+                            <View key={question.id}>
+                                <Question question={question} />
+                            </View>
+                        ))}
+                    </View>
+                <Button title="Submit" onPress={methods.handleSubmit(onSubmit)} />
             </ScrollView>
+            </FormProvider>
         )
     }
 }
 
 const styles = StyleSheet.create({
+    options: {
+        flexDirection: 'row'
+    },
   container: {
     padding: 16,
   },
