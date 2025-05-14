@@ -2,18 +2,23 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-import initDatabase from '../../app/database/initDB';
-import { loadLocalForms, syncForms } from '../../app/database/queryWriter';
+import { useRouter } from 'expo-router';
+import { useEffect, useState, } from 'react';
+import { Button, StyleSheet } from 'react-native';
+import initDatabase from '../../database/initDB';
+import { loadLocalForms, syncForms } from '../../database/queryWriter';
 
-export default function GetForms(){
+
+export default function FormIndex(){
+    const router = useRouter();
+    
     const [forms, setForms] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const initForms = async () => {
             await initDatabase();
+            //await queryWriter('ALTER TABLE questions ADD COLUMN question_type;')
             await syncForms();
             const localForms = await loadLocalForms();
             console.log(localForms)
@@ -23,6 +28,21 @@ export default function GetForms(){
         initForms()
     }, []);
 
+    function goToForm(form){
+        router.push({
+            pathname: '/tabs/forms/[id]',
+            params: { id: form.id }
+
+        })
+    }
+    function goToResponse(form){
+        router.push({
+            pathname: '/tabs/forms/response/[id]',
+            params: { id: form.id }
+
+        })
+    }
+    
     function Forms(){
         if (loading) return <ThemedText>Loading...</ThemedText>;
         if (!forms || forms.length === 0) return <ThemedText>No forms yet!</ThemedText>;
@@ -34,6 +54,8 @@ export default function GetForms(){
                                 <ThemedText type="subtitle">{form.form_name}</ThemedText>
                                 <ThemedText type="defaultSemiBold">From {form.organization_name}</ThemedText>
                                 <ThemedText>Open from {form.start_date} to {form.end_date}</ThemedText>
+                            <Button title="View Form" onPress={() => goToForm(form)}/>
+                            <Button title="New Response" onPress={() => goToResponse(form)}/>
                         </ThemedView>
                     ))}
                 </ThemedView>

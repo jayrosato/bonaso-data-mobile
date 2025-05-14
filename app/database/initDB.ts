@@ -6,6 +6,7 @@ const queries = [
         username TEXT,
         password TEXT
         );`,
+
     `CREATE TABLE IF NOT EXISTS forms (
         id INTEGER PRIMARY KEY NOT NULL, 
         form_name TEXT, 
@@ -13,6 +14,43 @@ const queries = [
         organization_name TEXT, 
         start_date TEXT, 
         end_date TEXT);`,
+
+    `CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY NOT NULL,
+        form INTEGER,
+        question_index INTEGER,
+        question TEXT,
+        question_type TEXT,
+        FOREIGN KEY (form) REFERENCES forms(id)
+        );`,
+
+    `CREATE TABLE IF NOT EXISTS options (
+        id INTEGER PRIMARY KEY NOT NULL,
+        question INTEGER,
+        option_text TEXT,
+        special, TEXT,
+        FOREIGN KEY (question) REFERENCES questions(id)
+        );`,
+
+    `CREATE TABLE IF NOT EXISTS logic (
+        id INTEGER PRIMARY KEY NOT NULL,
+        question INTEGER,
+        conditional_operator TEXT,
+        limit_options TEXT,
+        FOREIGN KEY (question) REFERENCES questions(id)
+        );`,
+
+    `CREATE TABLE IF NOT EXISTS logic_rules(
+        id INTEGER PRIMARY KEY NOT NULL,
+        logic INTEGER,
+        parent_question INTEGER,
+        expected_value TEXT,
+        value_comparison TEXT,
+        negate_value TEXT,
+        FOREIGN KEY (logic) REFERENCES logic(id),
+        FOREIGN KEY(parent_question) REFERENCES questions(id)
+        );`,
+
     `CREATE TABLE IF NOT EXISTS respondents (
         id INTEGER PRIMARY KEY NOT NULL, 
         id_no TEXT,
