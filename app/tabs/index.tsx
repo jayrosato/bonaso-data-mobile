@@ -4,8 +4,18 @@ import { Platform, StyleSheet } from 'react-native';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-
+import { useEffect } from 'react';
+import initDatabase from '../database/initDB';
+import { cleanLocalStorage, syncResponses } from '../database/queryWriter';
 export default function HomeScreen() {
+    useEffect(() => {
+            const syncData = async () => {
+                await initDatabase();
+                await syncResponses();
+                await cleanLocalStorage();
+            }
+            syncData()
+        }, []);
   return (
     <ParallaxScrollView
         headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}

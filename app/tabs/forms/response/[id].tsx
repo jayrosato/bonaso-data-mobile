@@ -1,4 +1,4 @@
-import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
+import { loadLocalByID, loadLocalFromArray, storeResponseLocally, syncResponses } from '@/app/database/queryWriter';
 import { ThemedText } from '@/components/ThemedText';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
@@ -13,7 +13,7 @@ function RadioButtons( { question } ){
     useEffect(() => {
         setValue(question.id.toString(), []);
     }, [question.id, setValue]);
-    
+
     const options = question.options
     return(
         <Controller control={control} name={question.id.toString()} defaultValue={null}
@@ -417,28 +417,16 @@ export default function NewResponse(){
     const { control, handleSubmit, formState: { errors } } = methods;
 
     const onSubmit = async (data) => {
-        console.log('submit', data);
-        try{
-            const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
-            const response = await fetch(`http://${dn}/forms/mobile/upload/response`, 
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({  form: form.id,
+        console.log('Preparing to store response locally', data);
+        const responsePackage = {  form: form.id,
                                             created_by: 1,
                                             created_on: Date.now()/1000,
                                             response_data: data
-                                        }),
-                })
-            const result = await response.json();
-            console.log('Response from server:', result);
-        }
-        catch(err){
-            console.error('Error accessing database: ', err)
-        }
+                                        }
+        await storeResponseLocally(responsePackage)
+        await syncResponses()
     }
+
     //return the actual form
     if (loading) return <Text>Loading...</Text>;
     if (!form.questions || form.questions.length === 0) return <Text>This form has no questions.</Text>;

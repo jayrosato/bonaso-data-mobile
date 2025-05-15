@@ -52,7 +52,8 @@ const queries = [
         );`,
 
     `CREATE TABLE IF NOT EXISTS respondents (
-        id INTEGER PRIMARY KEY NOT NULL, 
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        linked_id INTEGER, 
         id_no TEXT,
         fname TEXT,
         lname TEXT,
@@ -66,13 +67,27 @@ const queries = [
         contact_no TEXT,
         created_by TEXT
         );`,
-    `CREATE TABLE IF NOT EXISTS response (
-        id INTEGER PRIMARY KEY NOT NULL,
+
+    `CREATE TABLE IF NOT EXISTS responses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         respondent INTEGER,
         form INTEGER,
         created_on TEXT,
+        created_by INTEGER,
+        is_synced INTEGER DEFAULT 0,
         FOREIGN KEY (respondent) REFERENCES respondents(id),
         FOREIGN KEY (form) REFERENCES forms(id)
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        response INTEGER,
+        question INTEGER,
+        option INTEGER, 
+        open_answer TEXT,
+        FOREIGN KEY (response) REFERENCES responses(id),
+        FOREIGN KEY (question) REFERENCES questions(id),
+        FOREIGN KEY (option) REFERENCES options(id)
     );`,
 ]
 
