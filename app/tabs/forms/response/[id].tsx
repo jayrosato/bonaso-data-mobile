@@ -9,7 +9,11 @@ import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 
     //basic components to replicate radio buttons/checkboxes 
 function RadioButtons( { question } ){
-    const { control } = useFormContext();
+    const { control, setValue } = useFormContext();
+    useEffect(() => {
+        setValue(question.id.toString(), []);
+    }, [question.id, setValue]);
+    
     const options = question.options
     return(
         <Controller control={control} name={question.id.toString()} defaultValue={null}
@@ -46,7 +50,11 @@ function RadioButtons( { question } ){
 
 function YNButtons({ question }){
     const options = ['Yes', 'No']
-    const { control } = useFormContext();
+    const { control, setValue } = useFormContext();
+    useEffect(() => {
+        setValue(question.id.toString(), []);
+    }, [question.id, setValue]);
+
     return(
         <Controller control={control} name={question.id.toString()} defaultValue={[]}
             render={({ field: {onChange, value}}) => {
@@ -81,16 +89,19 @@ function YNButtons({ question }){
 }
 //need to find a way to clear this if hidden
 function Checkboxes( { question, onlyShow=null } ){
-    const { control } = useFormContext();
+    const { control, setValue, getValues } = useFormContext();
     let options = question.options
     if(Array.isArray(onlyShow) && onlyShow.some(opt => opt && typeof opt === 'object')){
         if(onlyShow[0].special !== 'All'){
             let osText = []
             onlyShow.forEach(opt => osText.push(opt.text.trim().toLowerCase()))
             options = options.filter(option => osText.includes(option.text.trim().toLowerCase()) || option.special === 'None of the above')
-
         }
     }
+    useEffect(() => {
+        setValue(question.id.toString(), []);
+    }, [question.id, setValue]);
+
     return(
         <Controller control={control} name={question.id.toString()} defaultValue={[]}
             render={({ field: {onChange, value }}) => {
@@ -154,7 +165,6 @@ function Question({ question }){
             let val = watchedValues[rule.parent_question];
             console.log(val)
             let match = false;
-            //I worry that that filter line will create a problem, but it seems to work for now, so \_''_/
             if(typeof val === 'undefined'){
                 return match
             }
@@ -201,7 +211,7 @@ function Question({ question }){
         }
     }
 
-    if (!show) return null;
+    if (!show) return null
     
     if(question.type === 'Text'){
         return(
@@ -225,17 +235,17 @@ function Question({ question }){
         return(
             <View>
                 <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-            <Controller control={control} rules={{ min:0 }}
-                render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                    placeholder="Type any number here..."
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
+                <Controller control={control} rules={{ min:0 }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                        placeholder="Type any number here..."
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                    />
+                    )}
+                    name={question.id.toString()}
                 />
-                )}
-                name={question.id.toString()}
-            />
             </View>
         )
     }
@@ -243,7 +253,7 @@ function Question({ question }){
         return(
             <View>
                 <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-            <YNButtons question = {question} />
+                <YNButtons question = {question} />
             </View>
         )
     }
@@ -251,7 +261,7 @@ function Question({ question }){
         return(
             <View>
                 <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-            <RadioButtons question={question} />
+                <RadioButtons question={question} />
             </View>
         )
     }
@@ -259,7 +269,7 @@ function Question({ question }){
         return(
             <View>
                 <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-            <Checkboxes question={question} onlyShow={selected}/>
+                <Checkboxes question={question} onlyShow={selected}/>
             </View>
         )
     }
@@ -406,10 +416,29 @@ export default function NewResponse(){
     const methods = useForm();
     const { control, handleSubmit, formState: { errors } } = methods;
 
-    const onSubmit = (data) => {
+    const onSubmit = async (data) => {
         console.log('submit', data);
+        try{
+            const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
+            const response = await fetch(`http://${dn}/forms/mobile/upload/response`, 
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({  form: form.id,
+                                            created_by: 1,
+                                            created_on: Date.now()/1000,
+                                            response_data: data
+                                        }),
+                })
+            const result = await response.json();
+            console.log('Response from server:', result);
+        }
+        catch(err){
+            console.error('Error accessing database: ', err)
+        }
     }
-
     //return the actual form
     if (loading) return <Text>Loading...</Text>;
     if (!form.questions || form.questions.length === 0) return <Text>This form has no questions.</Text>;
