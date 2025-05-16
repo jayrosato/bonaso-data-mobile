@@ -17,8 +17,6 @@ export default function Layout() {
                             <FontAwesome6 name="wpforms" size={24} color={color} />
                     )}}
                 />
-
-                <Tabs.Screen name="+not-found" options={{ href: null }} />
             </Tabs>
     );
 }

@@ -5,8 +5,8 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, } from 'react';
 import { Button, StyleSheet } from 'react-native';
-import initDatabase from '../../database/initDB';
-import { loadLocalForms, syncForms } from '../../database/queryWriter';
+import initDatabase from '../../../database/initDB';
+import { loadLocalForms, syncForms } from '../../../database/queryWriter';
 
 
 export default function FormIndex(){

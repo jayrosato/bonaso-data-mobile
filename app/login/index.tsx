@@ -1,0 +1,155 @@
+import { ThemedText } from '@/components/ThemedText';
+import { useAuth } from '@/context/AuthContext';
+import { getSecureItem, saveSecureItem } from '@/services/secure-storage-functions';
+import bcrypt from "bcryptjs";
+import * as ExpoCrypto from 'expo-crypto';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Controller, FormProvider, useForm } from "react-hook-form";
+import { Button, ScrollView, StyleSheet, TextInput } from 'react-native';
+
+// Fallback random generator for bcryptjs
+bcrypt.setRandomFallback((len) => {
+    const randomBytes = ExpoCrypto.getRandomBytes(len);
+    return Array.from(randomBytes); // bcryptjs expects an array of integers
+});
+
+async function hashPassword(password) {
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+    return hash;
+}
+
+async function offlineLogin(username, password){
+    const storedCredentials = await getSecureItem('user_credentials')
+    if(storedCredentials){
+        const cred = JSON.parse(storedCredentials)
+        if(username === cred.username){
+            const match = await bcrypt.compare(password, cred.password);
+            if(match){
+                console.log('credentials met')
+                return match
+            }
+            else{
+                console.log('Incorrect password.')
+                return false
+            }
+        }
+        else{
+            console.log('Incorrect login info.')
+            return false
+        }
+    }
+    else{
+        console.warn('Offline login not available.')
+        return false
+    }
+}
+export default function Login(){
+    const [response, setResponse] = useState('')
+    const { signIn, offlineSignIn, isAuthenticated } = useAuth();
+    const router = useRouter();
+    
+    const onSubmit = async (data) => {
+        console.log('hacking the mainframe', data);
+        const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
+        const username = data.username
+        const password = data.password
+        /*
+        const checkCred = await offlineLogin(username, password)
+        if(checkCred){
+            offlineSignIn(ExpoCrypto.getRandomBytes(16).toString())
+            console.log('redirecting')
+            router.replace('/authorized/tabs');
+        }
+        */
+        try{
+            const response = await fetch(`http://${dn}/account/api/token/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 'username':username, 'password':password }),
+            })
+            const data = await response.json();
+            console.log(data)
+            await signIn(data)
+            if(isAuthenticated){
+                const hashed = await hashPassword(password)
+                const offlineCredentials = {
+                    'username': username,
+                    'password': hashed,
+                }
+                saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))
+                console.log('Offline login now available!')
+                router.replace('/authorized/tabs');
+            }
+        }   
+        catch(err){
+            console.error('Failed to log in: ', err)
+            console.log('false')
+        }
+    }
+
+    const methods = useForm();
+    const { control, handleSubmit, formState: { errors } } = methods;
+
+    return(
+        <FormProvider {...methods}>
+            <ScrollView style={styles.container}>
+                <ThemedText type="defaultSemiBold">Username</ThemedText>
+                <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                        placeholder="username"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                    />
+                    )}
+                    name="username"
+                />
+                {errors.username && <ThemedText style={styles.errorText}>This field is required!</ThemedText>}
+
+                <ThemedText type="defaultSemiBold" >Password</ThemedText>
+                <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                        placeholder="password"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                        secureTextEntry={true}
+                    />
+                    )}
+                    name="password"
+                />
+                {errors.password && <ThemedText style={styles.errorText}>This field is required!</ThemedText>}
+
+                <Button title="Submit" onPress={methods.handleSubmit(onSubmit)} />
+
+                {response && <ThemedText> {response}</ThemedText>}
+            </ScrollView>
+        </FormProvider>
+    )
+}
+
+const styles = StyleSheet.create({
+    options: {
+        flexDirection: 'row'
+    },
+  container: {
+    padding: 16,
+  },
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 8,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+  },
+});
