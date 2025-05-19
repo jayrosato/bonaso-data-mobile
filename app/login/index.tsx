@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/context/AuthContext';
 import { useConnection } from '@/context/ConnectionContext';
-import { getSecureItem, saveSecureItem } from '@/services/secure-storage-functions';
+import { deleteSecureItem, getSecureItem, saveSecureItem } from '@/services/secure-storage-functions';
 import bcrypt from "bcryptjs";
 import * as ExpoCrypto from 'expo-crypto';
 import { randomUUID } from 'expo-crypto';
@@ -27,6 +27,14 @@ async function offlineLogin(username, password){
     if(storedCredentials){
         try{
             const cred = JSON.parse(storedCredentials)
+            const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+            const now = new Date();
+            const createdOn = new Date(cred.created_on);
+
+            if (now - createdOn > THIRTY_DAYS_MS) {
+                console.warn('Offline credentials expired. You must connect to the internet to log in.')
+                return false
+            }
             if(username === cred.username){
                 const match = await bcrypt.compare(password, cred.password);
                 if(match){
@@ -44,6 +52,7 @@ async function offlineLogin(username, password){
             }
         }
         catch(err){
+            await deleteSecureItem('user_credentials');
             console.error('Offline credentials corrupted: ', err)
         }
     }
@@ -57,7 +66,7 @@ export default function Login(){
     const { signIn, offlineSignIn, isAuthenticated } = useAuth();
     const { isConnected, isServerReachable } = useConnection();
     const router = useRouter();
-    
+    const today = new Date();
     const onSubmit = async (data) => {
         const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
         const username = data.username
@@ -80,7 +89,8 @@ export default function Login(){
                 const offlineCredentials = {
                     'username': username,
                     'password': hashed,
-                    'access_level': loginResponse.access_level
+                    'access_level': loginResponse.access_level,
+                    'created_on': today.toISOString()
                 }
                 await saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))
                 console.log('Offline login now available!')

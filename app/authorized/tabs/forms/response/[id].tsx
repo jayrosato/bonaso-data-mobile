@@ -1,13 +1,15 @@
 import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
 import { ThemedText } from '@/components/ThemedText';
+import { useConnection } from '@/context/ConnectionContext';
 import { storeResponseLocally } from '@/sync-load-queries/store-local-response';
 import { syncResponses } from '@/sync-load-queries/sync-responses';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Controller, FormProvider, useForm, useFormContext, useWatch } from "react-hook-form";
 import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { showMessage } from "react-native-flash-message";
 
     //basic components to replicate radio buttons/checkboxes 
 function RadioButtons( { question } ){
@@ -279,6 +281,9 @@ function Question({ question }){
 
 export default function NewResponse(){
     //load necessary information about the form
+    const { isConnected, isServerReachable } = useConnection();
+    const router = useRouter();
+
     const { id } = useLocalSearchParams();
     const [form, setForm] = useState({
         id: null,
@@ -426,7 +431,11 @@ export default function NewResponse(){
                                             response_data: data
                                         }
         await storeResponseLocally(responsePackage)
-        await syncResponses()
+        if(isServerReachable){
+            await syncResponses()
+        }
+        showMessage({message: "Your response has been successfuly recorded", type: "info",});
+        router.push({pathname: '/authorized/tabs/forms'})
     }
 
     //return the actual form
