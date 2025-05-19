@@ -1,5 +1,7 @@
-import { loadLocalByID, loadLocalFromArray, storeResponseLocally, syncResponses } from '@/app/database/queryWriter';
+import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
 import { ThemedText } from '@/components/ThemedText';
+import { storeResponseLocally } from '@/sync-load-queries/store-local-response';
+import { syncResponses } from '@/sync-load-queries/sync-responses';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams } from 'expo-router';

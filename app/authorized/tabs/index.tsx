@@ -4,14 +4,21 @@ import { Platform, StyleSheet } from 'react-native';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useConnection } from '@/context/ConnectionContext';
+import { cleanLocalStorage } from '@/sync-load-queries/clean-local-storage';
+import { syncResponses } from '@/sync-load-queries/sync-responses';
 import { useEffect } from 'react';
 import initDatabase from '../../database/initDB';
-import { cleanLocalStorage, syncResponses } from '../../database/queryWriter';
+
 export default function HomeScreen() {
+    const { isConnected, isServerReachable } = useConnection();
+    console.log('Server status: ', isServerReachable)
     useEffect(() => {
             const syncData = async () => {
                 await initDatabase();
-                await syncResponses();
+                if(isServerReachable){
+                    await syncResponses();
+                }
                 await cleanLocalStorage();
             }
             syncData()

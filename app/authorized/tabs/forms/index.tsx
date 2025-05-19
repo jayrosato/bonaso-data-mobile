@@ -1,17 +1,18 @@
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useConnection } from '@/context/ConnectionContext';
+import { loadLocalForms } from '@/sync-load-queries/load-local-forms';
+import { syncForms } from '@/sync-load-queries/sync-forms';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, } from 'react';
 import { Button, StyleSheet } from 'react-native';
 import initDatabase from '../../../database/initDB';
-import { loadLocalForms, syncForms } from '../../../database/queryWriter';
-
-
 export default function FormIndex(){
     const router = useRouter();
-    
+    const { isConnected, isServerReachable } = useConnection();
+
     const [forms, setForms] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -19,7 +20,9 @@ export default function FormIndex(){
         const initForms = async () => {
             await initDatabase();
             //await queryWriter('ALTER TABLE questions ADD COLUMN question_type;')
-            await syncForms();
+            if(isServerReachable){
+                await syncForms();
+            }
             const localForms = await loadLocalForms();
             console.log(localForms)
             setForms(localForms);
@@ -30,14 +33,14 @@ export default function FormIndex(){
 
     function goToForm(form){
         router.push({
-            pathname: '/tabs/forms/[id]',
+            pathname: 'authorized/tabs/forms/[id]',
             params: { id: form.id }
 
         })
     }
     function goToResponse(form){
         router.push({
-            pathname: '/tabs/forms/response/[id]',
+            pathname: 'authorized/tabs/forms/response/[id]',
             params: { id: form.id }
 
         })

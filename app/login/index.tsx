@@ -1,8 +1,10 @@
 import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/context/AuthContext';
+import { useConnection } from '@/context/ConnectionContext';
 import { getSecureItem, saveSecureItem } from '@/services/secure-storage-functions';
 import bcrypt from "bcryptjs";
 import * as ExpoCrypto from 'expo-crypto';
+import { randomUUID } from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, FormProvider, useForm } from "react-hook-form";
@@ -23,21 +25,26 @@ async function hashPassword(password) {
 async function offlineLogin(username, password){
     const storedCredentials = await getSecureItem('user_credentials')
     if(storedCredentials){
-        const cred = JSON.parse(storedCredentials)
-        if(username === cred.username){
-            const match = await bcrypt.compare(password, cred.password);
-            if(match){
-                console.log('credentials met')
-                return match
+        try{
+            const cred = JSON.parse(storedCredentials)
+            if(username === cred.username){
+                const match = await bcrypt.compare(password, cred.password);
+                if(match){
+                    console.log('credentials met')
+                    return match
+                }
+                else{
+                    console.log('Incorrect password.')
+                    return false
+                }
             }
             else{
-                console.log('Incorrect password.')
+                console.log('Incorrect login info.')
                 return false
             }
         }
-        else{
-            console.log('Incorrect login info.')
-            return false
+        catch(err){
+            console.error('Offline credentials corrupted: ', err)
         }
     }
     else{
@@ -48,46 +55,49 @@ async function offlineLogin(username, password){
 export default function Login(){
     const [response, setResponse] = useState('')
     const { signIn, offlineSignIn, isAuthenticated } = useAuth();
+    const { isConnected, isServerReachable } = useConnection();
     const router = useRouter();
     
     const onSubmit = async (data) => {
-        console.log('hacking the mainframe', data);
         const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
         const username = data.username
         const password = data.password
-        /*
-        const checkCred = await offlineLogin(username, password)
-        if(checkCred){
-            offlineSignIn(ExpoCrypto.getRandomBytes(16).toString())
-            console.log('redirecting')
-            router.replace('/authorized/tabs');
-        }
-        */
-        try{
-            const response = await fetch(`http://${dn}/account/api/token/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 'username':username, 'password':password }),
-            })
-            const data = await response.json();
-            console.log(data)
-            await signIn(data)
-            if(isAuthenticated){
+        if(isServerReachable){
+            try{
+                console.log('hacking the mainframe: ', data)
+                const response = await fetch(`http://${dn}/account/api/token/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 'username':username, 'password':password }),
+                })
+                const loginResponse = await response.json();
+                console.log(loginResponse)
+                await signIn(loginResponse)
+
                 const hashed = await hashPassword(password)
                 const offlineCredentials = {
                     'username': username,
                     'password': hashed,
+                    'access_level': loginResponse.access_level
                 }
-                saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))
+                await saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))
                 console.log('Offline login now available!')
                 router.replace('/authorized/tabs');
+            }   
+            catch(err){
+                console.error('Failed to log in: ', err)
             }
-        }   
-        catch(err){
-            console.error('Failed to log in: ', err)
-            console.log('false')
+        }
+        else{
+            const checkCred = await offlineLogin(username, password)
+            if(checkCred){
+                const userSessionId = randomUUID();
+                await offlineSignIn(userSessionId);
+                console.log('redirecting')
+                router.replace('/authorized/tabs');
+            }
         }
     }
 
