@@ -164,10 +164,8 @@ function Question({ question }){
     if(rules.length > 0){
         const logic = question.logic?.[0];
         const operator = logic.conditional_operator;
-        const limitOptions = logic.limit_options;
         const evaluateRule = (rule) =>{
             let val = watchedValues[rule.parent_question];
-            console.log(val)
             let match = false;
             if(typeof val === 'undefined'){
                 return match
@@ -181,6 +179,7 @@ function Question({ question }){
             const expected = rule.expected_value;
             const comparison = rule.value_comparison;
             const negate = rule.negate_value;
+            const limitOptions = rule.limit_options;
             if(comparison === null || comparison === 'MATCHES'){
                 if(!Array.isArray(val)){
                     val = [val]
@@ -300,10 +299,9 @@ export default function NewResponse(){
     useEffect(() => {
             const initForm = async () => {
                 const form = await loadLocalByID('forms', 'id', id);
-                console.log('Form Info',form);
 
                 const questions = await loadLocalByID('questions', 'form', id);
-                console.log('Questions', questions)
+                console.log(questions)
 
                 let qIDs = [];
                 if(questions && questions.length > 0){
@@ -311,16 +309,13 @@ export default function NewResponse(){
                     qIDs.push(question.id)
                 });
                 }
-                
                 const options = await loadLocalFromArray('options', 'question', qIDs);
-                console.log('Options', options)
                 const qLogic = await loadLocalFromArray('logic', 'question', qIDs);
-                console.log('Logic', qLogic)
                 let qLogicIDs = [];
                 if(qLogic && qLogic.length > 0){
                     qLogic.forEach(logic => {
                     qLogicIDs.push(logic.id)
-                });
+                    });
                 }
                 let rules = null;
                 if(qLogicIDs.length > 0){
@@ -349,7 +344,7 @@ export default function NewResponse(){
                         if(matchOptions.length > 0){
                             for(const o of matchOptions){
                                 const option = {
-                                    'id': o.id,
+                                    'id': o.option_id,
                                     'text':o.option_text,
                                     'special': o.special
                                 };
@@ -369,7 +364,6 @@ export default function NewResponse(){
                                 const logic = {
                                     'id': log.id,
                                     'conditional_operator': log.conditional_operator,
-                                    'limit_options': log.limit_options,
                                     'rules': []
                                 };
                                 let matchRules = [];
@@ -387,7 +381,8 @@ export default function NewResponse(){
                                             'parent_question': r.parent_question,
                                             'expected_value': r.expected_value,
                                             'value_comparison': r.value_comparison,
-                                            'negate_value': r.negate_value
+                                            'negate_value': r.negate_value,
+                                            'limit_options': r.limit_options,
                                         }
                                         logic.rules.push(rule)
                                     }
@@ -418,7 +413,6 @@ export default function NewResponse(){
             initForm()
         }, [id]);
 
-
     //standard code for handling submit
     const methods = useForm();
     const { control, handleSubmit, formState: { errors } } = methods;
@@ -426,7 +420,6 @@ export default function NewResponse(){
     const onSubmit = async (data) => {
         console.log('Preparing to store response locally', data);
         const responsePackage = {  form: form.id,
-                                            created_by: 1,
                                             created_on: Date.now()/1000,
                                             response_data: data
                                         }

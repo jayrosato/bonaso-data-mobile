@@ -21,8 +21,6 @@ export const cleanLocalStorage = async () => {
             const check = await querySelector('SELECT * FROM responses')
             const checkA = await querySelector('SELECT * FROM answers')
 
-            console.log(check)
-            console.log(checkA)
             console.log('Successfuly cleared synced data')
         }
         results = await querySelector(`SELECT * FROM responses WHERE respondent IS NULL`)

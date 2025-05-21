@@ -1,15 +1,21 @@
+import { getSecureItem } from '@/services/secure-storage-functions';
 import { querySelector, queryWriter } from '../app/database/queryWriter';
-
 //prevent dual uploading here
 export const storeResponseLocally = async (data) => {
     try{
         console.log('Storing response locally')
         console.log(Object.keys(data))
-        const created_by = data.created_by;
         const created_on = data.created_on;
         const formID = data.form;
         const respInfo = data.response_data;
-
+        let userID = 1;
+        const storedCredentials = await getSecureItem('user_credentials')
+        if(storedCredentials){
+            const cred = JSON.parse(storedCredentials)
+            userID = parseInt(cred.user_id)
+        }
+        if(!userID){console.warn('Credentials are missing. Please try logging in again')}
+        const created_by = userID
         const respondentQuery = `INSERT OR REPLACE INTO respondents (linked_id, id_no, fname, lname, dob, 
         sex, ward, village, district, citizenship, email, contact_no, created_by) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -33,6 +39,7 @@ export const storeResponseLocally = async (data) => {
             VALUES (?, ?, ?, ?)`
         //hope this works
         const questions = Object.fromEntries(Object.entries(respInfo).filter(([key]) => Number.isInteger(Number(key))));
+        console.log('questions', questions)
         for(const [qID, answers] of Object.entries(questions)) {
             const question = parseInt(qID)
             if(Array.isArray(answers)){

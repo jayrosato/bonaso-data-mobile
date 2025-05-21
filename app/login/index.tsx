@@ -90,6 +90,7 @@ export default function Login(){
                     'username': username,
                     'password': hashed,
                     'access_level': loginResponse.access_level,
+                    'user_id': loginResponse.user_id,
                     'created_on': today.toISOString()
                 }
                 await saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))

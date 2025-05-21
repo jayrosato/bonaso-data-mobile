@@ -26,6 +26,7 @@ const queries = [
 
     `CREATE TABLE IF NOT EXISTS options (
         id INTEGER PRIMARY KEY NOT NULL,
+        option_id INTEGER,
         question INTEGER,
         option_text TEXT,
         special, TEXT,
@@ -36,7 +37,6 @@ const queries = [
         id INTEGER PRIMARY KEY NOT NULL,
         question INTEGER,
         conditional_operator TEXT,
-        limit_options TEXT,
         FOREIGN KEY (question) REFERENCES questions(id)
         );`,
 
@@ -47,6 +47,7 @@ const queries = [
         expected_value TEXT,
         value_comparison TEXT,
         negate_value TEXT,
+        limit_options TEXT,
         FOREIGN KEY (logic) REFERENCES logic(id),
         FOREIGN KEY(parent_question) REFERENCES questions(id)
         );`,

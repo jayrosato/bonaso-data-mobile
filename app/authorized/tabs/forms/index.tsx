@@ -2,6 +2,7 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useConnection } from '@/context/ConnectionContext';
+import { getSecureItem } from '@/services/secure-storage-functions';
 import { loadLocalForms } from '@/sync-load-queries/load-local-forms';
 import { syncForms } from '@/sync-load-queries/sync-forms';
 import { Image } from 'expo-image';
@@ -19,9 +20,13 @@ export default function FormIndex(){
     useEffect(() => {
         const initForms = async () => {
             await initDatabase();
-            //await queryWriter('ALTER TABLE questions ADD COLUMN question_type;')
             if(isServerReachable){
-                await syncForms();
+                const storedCredentials = await getSecureItem('user_credentials')
+                if(storedCredentials){
+                    const cred = JSON.parse(storedCredentials)
+                    const userID = cred.user_id
+                    await syncForms(userID);
+                }
             }
             const localForms = await loadLocalForms();
             console.log(localForms)
