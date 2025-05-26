@@ -8,6 +8,11 @@
     "scheme": "bonasodatamobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/bonaso-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -40,5 +45,6 @@
     "experiments": {
       "typedRoutes": true
     }
+    
   }
 }

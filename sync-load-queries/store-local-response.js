@@ -21,7 +21,7 @@ export const storeResponseLocally = async (data) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const respondentVals = [
             respInfo.linked_id, respInfo.id_no, respInfo.fname, respInfo.lname, respInfo.dob, respInfo.sex, respInfo.ward,
-            respInfo.village, respInfo.district, respInfo.citizenship, respInfo.email, respInfo.contact_no
+            respInfo.village, respInfo.district, respInfo.citizenship, respInfo.email, respInfo.contact_no, created_by
         ]
         await queryWriter(respondentQuery, respondentVals)
 

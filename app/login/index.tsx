@@ -1,3 +1,4 @@
+import LoadingScreen from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/context/AuthContext';
 import { useConnection } from '@/context/ConnectionContext';
@@ -62,16 +63,19 @@ async function offlineLogin(username, password){
     }
 }
 export default function Login(){
+    const [loading, setLoading] = useState(false);
     const [response, setResponse] = useState('')
     const { signIn, offlineSignIn, isAuthenticated } = useAuth();
     const { isConnected, isServerReachable } = useConnection();
     const router = useRouter();
     const today = new Date();
     const onSubmit = async (data) => {
+        console.log(isServerReachable);
         const dn = process.env.EXPO_PUBLIC_DOMAIN_NAME
         const username = data.username
         const password = data.password
         if(isServerReachable){
+            setLoading(true);
             try{
                 console.log('hacking the mainframe: ', data)
                 const response = await fetch(`http://${dn}/account/api/token/`, {
@@ -95,6 +99,7 @@ export default function Login(){
                 }
                 await saveSecureItem('user_credentials', JSON.stringify(offlineCredentials))
                 console.log('Offline login now available!')
+                setLoading(false);
                 router.replace('/authorized/tabs');
             }   
             catch(err){
@@ -102,11 +107,14 @@ export default function Login(){
             }
         }
         else{
+            setLoading(true);
             const checkCred = await offlineLogin(username, password)
             if(checkCred){
+                console.log('Found offline credentials...')
                 const userSessionId = randomUUID();
                 await offlineSignIn(userSessionId);
                 console.log('redirecting')
+                setLoading(false);
                 router.replace('/authorized/tabs');
             }
         }
@@ -114,10 +122,11 @@ export default function Login(){
 
     const methods = useForm();
     const { control, handleSubmit, formState: { errors } } = methods;
-
+    if(loading){return <LoadingScreen />}
     return(
         <FormProvider {...methods}>
             <ScrollView style={styles.container}>
+                <ThemedText type="title" style={styles.title}>Login</ThemedText>
                 <ThemedText type="defaultSemiBold">Username</ThemedText>
                 <Controller control={control} rules={{ required: true, maxLength: 255 }}
                     render={({ field: { onChange, onBlur, value } }) => (
@@ -156,21 +165,25 @@ export default function Login(){
 }
 
 const styles = StyleSheet.create({
-    options: {
-        flexDirection: 'row'
+    title:{
+        height: 50,
+        marginBottom: 10,
     },
-  container: {
-    padding: 16,
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 10,
-    padding: 8,
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 10,
-  },
+    container: {
+        display: 'flex',
+        flexDirection: 'column',
+        top: 200,
+        margin: 40,
+    },
+    input: {
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        marginBottom: 10,
+        padding: 8,
+    },
+    errorText: {
+        color: 'red',
+        marginBottom: 10,
+    },
 });

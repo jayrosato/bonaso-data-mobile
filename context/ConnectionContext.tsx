@@ -5,21 +5,32 @@ import { createContext, useContext, useEffect, useState } from "react";
 const ConnectionContext = createContext({ isConnected: true, isServerReachable: true })
 
 export const ConnectionTest = ({ children }) => {
-    const[isConnected, setIsConnected] = useState(true);
-    const[isServerReachable, setIsServerReachable] = useState(true)
+    const[isConnected, setIsConnected] = useState(false);
+    const[isServerReachable, setIsServerReachable] = useState(false);
+    
+    const checkConnection = async () => {
+        console.log('Checking connection...');
+        const state = await NetInfo.fetch();
+        const connected = !!state.isConnected;
+        setIsConnected(connected);
+
+        if (connected) {
+            const serverResponse = await checkServerConnection();
+            setIsServerReachable(serverResponse);
+        } 
+        else {
+            setIsServerReachable(false);
+        }
+    };
+
     useEffect(() => {
+        checkConnection();
         const interval = setInterval(async () => {
-            console.log('Checking connection...')
-            const state = await NetInfo.fetch();
-            setIsConnected(!!state.isConnected);
-            if(isConnected){
-                const serverResponse = await checkServerConnection();
-                setIsServerReachable(serverResponse);
-            }
+            checkConnection();
         }, 60000);
         
         return () => clearInterval(interval);
-    }, [isConnected])
+    }, [])
 
     return (
         <ConnectionContext.Provider value={{ isConnected, isServerReachable }}>
