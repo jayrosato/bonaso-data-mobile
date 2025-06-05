@@ -256,6 +256,7 @@ function Question({ question }){
                     render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
                         placeholder="Type answer here..."
+                        placeholderTextColor={theme.colors.lightGrey}
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -275,7 +276,7 @@ function Question({ question }){
                     render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
                         placeholder="Type any number here..."
-                        placeholderTextColor={theme.colors.lightText}
+                        placeholderTextColor={theme.colors.lightGrey}
                         onBlur={onBlur}
                         value={value}
                         onChangeText={(text) => {

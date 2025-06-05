@@ -138,7 +138,7 @@ export default function Login(){
                     <TextInput
                         style={styles.input}
                         placeholder="Type your username here..."
-                        placeholderTextColor={theme.colors.lightText}
+                        placeholderTextColor={theme.colors.lightGrey}
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -154,7 +154,7 @@ export default function Login(){
                     <TextInput
                         style={styles.input}
                         placeholder="Enter your password here..."
-                        placeholderTextColor={theme.colors.lightText}
+                        placeholderTextColor={theme.colors.lightGrey}
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
