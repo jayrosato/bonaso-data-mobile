@@ -1,14 +1,17 @@
 import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
+import LoadingScreen from '@/components/LoadingScreen';
+import ThemedButton from '@/components/ThemedButton';
 import { ThemedText } from '@/components/ThemedText';
 import { useConnection } from '@/context/ConnectionContext';
 import { storeResponseLocally } from '@/sync-load-queries/store-local-response';
 import { syncResponses } from '@/sync-load-queries/sync-responses';
+import theme from '@/themes/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, FormProvider, useForm, useFormContext, useWatch } from "react-hook-form";
-import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { showMessage } from "react-native-flash-message";
 
     //basic components to replicate radio buttons/checkboxes 
@@ -24,7 +27,7 @@ function RadioButtons( { question } ){
             render={({ field: {onChange, value}}) => {
                 const selected = value || [];
                 const toggleOption = (option) => {
-                    const isSelected = selected.id === option.id;
+                    const isSelected = selected.some(s => s.id === option.id);
                     if(isSelected){
                         onChange([])
                     }
@@ -37,12 +40,12 @@ function RadioButtons( { question } ){
                                 <View key={option.id} style={styles.options}>
                                     <TouchableOpacity onPress={() => toggleOption(option)}>
                                         <Ionicons
-                                            name={selected.id === option.id ? 'radio-button-on-outline' : 'radio-button-off-outline'}
-                                            size={24}
-                                            color="red"
+                                            name={selected.some(s => s.id === option.id) ? 'radio-button-on-outline' : 'radio-button-off-outline'}
+                                            size={30}
+                                            color={theme.colors.lightBackground}
                                         />
                                     </TouchableOpacity>
-                                    <Text>{option.text}</Text>
+                                    <ThemedText>{option.text}</ThemedText>
                                 </View>
                             ))}
                         </View>
@@ -79,10 +82,10 @@ function YNButtons({ question }){
                                         <Ionicons
                                             name={selected.some(s => s === option) ? 'radio-button-on-outline' : 'radio-button-off-outline'}
                                             size={24}
-                                            color="red"
+                                            color={theme.colors.lightBackground}
                                         />
                                     </TouchableOpacity>
-                                    <Text>{option}</Text>
+                                    <ThemedText>{option}</ThemedText>
                                 </View>
                             ))}
                         </View>
@@ -134,11 +137,11 @@ function Checkboxes( { question, onlyShow=null } ){
                             <TouchableOpacity onPress={() => toggleOption(option)}>
                                 <Ionicons
                                     name={selected.some(s => s.id === option.id) ? 'checkbox' : 'checkbox-outline'}
-                                    size={24}
-                                    color="red"
+                                    size={30}
+                                    color={theme.colors.lightBackground}
                                 />
                             </TouchableOpacity>
-                            <Text>{option.text}</Text>
+                            <ThemedText>{option.text}</ThemedText>
                         </View>
                     ))}
                 </View>
@@ -150,22 +153,16 @@ function Checkboxes( { question, onlyShow=null } ){
 
 function Question({ question }){
     const { control } = useFormContext();
-    const watchedValues = {};
-    const rules = question.logic?.[0]?.rules || [];
-    const [selected, setSelected] = useState(null)
-    for (let rule of rules) {
-        watchedValues[rule.parent_question] = useWatch({
-            control: control,
-            name: rule.parent_question.toString(),
-        });
-    }
+    const rules = question.logic?.[0]?.rules || []
+    const operator = question.logic?.[0]?.conditional_operator || 'AND';
 
-    let show = true
-    if(rules.length > 0){
-        const logic = question.logic?.[0];
-        const operator = logic.conditional_operator;
-        const evaluateRule = (rule) =>{
-            let val = watchedValues[rule.parent_question];
+    const parentQuestions = useMemo(() => rules.map(rule => rule.parent_question.toString()), [rules]);
+    const parentValues = useWatch({ control, name: parentQuestions })
+
+    const [selected, setSelected] = useState(null)
+
+    const show = useMemo(() => {
+        const evaluateRule = (rule, val) =>{
             let match = false;
             if(typeof val === 'undefined'){
                 return match
@@ -187,6 +184,20 @@ function Question({ question }){
                 if(val.includes(expected)){
                     match = true
                 }
+                else if(val.some(v => v && typeof v === 'object' && v.id == expected)){
+                    match = true
+                }
+                else if(val.length > 0 && expected === 'any'){
+                    match = true
+                }
+            }
+            else if(comparison === 'EQUAL TO'){
+                if(!isNaN(val) && ! isNaN(expected)){
+                    match = val === expected
+                }
+                else{
+                    match = false
+                }
             }
             //assume that these will always be text inputs and will return a single value
             else if(comparison === 'CONTAINS'){
@@ -196,55 +207,59 @@ function Question({ question }){
                 match = val.includes(expected) ? false : true
             }
             else if(comparison === 'GREATER THAN'){
-                match = val > expected ? true : false
-            }
+                if(!isNaN(val) && ! isNaN(expected)){
+                    match = parseInt(val) > parseInt(expected) ? true : false
+                }
+                else{
+                    match = false
+                }
+            }   
             else if(comparison === 'LESS THAN'){
-                match = val < expected ? true : false
+                if(!isNaN(val) && ! isNaN(expected)){
+                    match = parseInt(val) < parseInt(expected) ? true : false
+                }
+                else{
+                    match = false
+                }
             }
-            if(limitOptions && val !== selected){
-                setSelected(val)
-            }
-            return negate ? !match : match
-        }
-        if(operator === 'AND'){
-            show = rules.every(evaluateRule)
-        }
-        if(operator === 'OR'){
-            show = rules.some(evaluateRule)
-        }
-    }
 
-    if (!show) return null
+            return negate !== '0' ? !match : match
+        };
+        const results = rules.map((rule, index) => evaluateRule(rule, parentValues[index]));
+
+        if (rules.some(rule => rule.limit_options)) {
+            const valWithLimit = parentValues.find((val, idx) => rules[idx].limit_options);
+            if (valWithLimit !== selected) {
+                setSelected(valWithLimit); 
+            }
+        }
+
+        return operator === 'AND' ? results.every(Boolean) : results.some(Boolean);
+    }, [parentValues, rules, operator, selected]);
+
+    useEffect(() => {
+        const idx = rules.findIndex(rule => rule.limit_options);
+        if(idx !== -1){
+            const valWithLimit = parentValues[idx];
+            if(valWithLimit !== selected){
+                setSelected(valWithLimit);
+            }
+        }
+    })
+    if (!show) return null;
     
     if(question.type === 'Text'){
         return(
-            <View>
-                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-            <Controller control={control} rules={{  }}
-                render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                    placeholder="Type answer here..."
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                />
-                )}
-                name={question.id.toString()}
-            />
-            </View>
-        )
-    }
-    if(question.type === 'Number'){
-        return(
-            <View>
-                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
-                <Controller control={control} rules={{ min:0 }}
+            <View style={styles.block}>
+                <ThemedText type="subtitle" style={{ marginBottom: 15 }}>{question.text}</ThemedText>
+                <Controller control={control} rules={{  }}
                     render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                        placeholder="Type any number here..."
+                        placeholder="Type answer here..."
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
+                        style={styles.textInput}
                     />
                     )}
                     name={question.id.toString()}
@@ -252,26 +267,50 @@ function Question({ question }){
             </View>
         )
     }
+    if(question.type === 'Number'){
+        return(
+            <View style={styles.block}>
+                <ThemedText type="subtitle" style={{ marginBottom: 15 }}>{question.text}</ThemedText>
+                <Controller control={control} rules={{ min:0, pattern: /^\d+$/ }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                        placeholder="Type any number here..."
+                        placeholderTextColor={theme.colors.lightText}
+                        onBlur={onBlur}
+                        value={value}
+                        onChangeText={(text) => {
+                            const numericText = text.replace(/[^0-9]/g, '');
+                            onChange(numericText);
+                        }}
+                        style={styles.textInput}
+                    />
+                    )}
+                    name={question.id.toString()}
+                />
+            </View>
+            
+        )
+    }
     if(question.type === 'Yes/No'){
         return(
-            <View>
-                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <View style={styles.block}>
+                <ThemedText type="subtitle" style={{ marginBottom: 15 }}>{question.text}</ThemedText>
                 <YNButtons question = {question} />
             </View>
         )
     }
     if(question.type === 'Single Selection'){
         return(
-            <View>
-                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <View style={styles.block}>
+                <ThemedText type="subtitle" style={{ marginBottom: 15 }}>{question.text}</ThemedText>
                 <RadioButtons question={question} />
             </View>
         )
     }
     if(question.type === 'Multiple Selections'){
         return(
-            <View>
-                <ThemedText type="defaultSemiBold">{question.text}</ThemedText>
+            <View style={styles.block}>
+                <ThemedText type="subtitle" style={{ marginBottom: 15 }}>{question.text}</ThemedText>
                 <Checkboxes question={question} onlyShow={selected}/>
             </View>
         )
@@ -301,7 +340,6 @@ export default function NewResponse(){
                 const form = await loadLocalByID('forms', 'id', id);
 
                 const questions = await loadLocalByID('questions', 'form', id);
-                console.log(questions)
 
                 let qIDs = [];
                 if(questions && questions.length > 0){
@@ -320,7 +358,6 @@ export default function NewResponse(){
                 let rules = null;
                 if(qLogicIDs.length > 0){
                     rules = await loadLocalFromArray('logic_rules', 'logic', qLogicIDs)
-                    console.log('rules', rules)
                 }
                 let questionsArray = [];
                 if(questions && questions.length > 0){
@@ -418,7 +455,7 @@ export default function NewResponse(){
     const { control, handleSubmit, formState: { errors } } = methods;
 
     const onSubmit = async (data) => {
-        console.log('Preparing to store response locally', data);
+        console.log('Preparing to store response locally...', data);
         const responsePackage = {  form: form.id,
                                             created_on: Date.now()/1000,
                                             response_data: data
@@ -432,169 +469,208 @@ export default function NewResponse(){
     }
 
     //return the actual form
-    if (loading) return <Text>Loading...</Text>;
+    if(loading){ return <LoadingScreen /> }
     if (!form.questions || form.questions.length === 0) return <Text>This form has no questions.</Text>;
     if(form.questions.length > 0){
         const questions = form.questions
         return (
             <FormProvider {...methods}>
-            <ScrollView style={styles.container}>
-                <ThemedText type="title">New Response for {form.name}</ThemedText>
-                <ThemedText>{questions.length} questions (max)</ThemedText>
-                    <View>
-                        <ThemedText type="subtitle">Respondent Information</ThemedText>
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="ID or Passport Number"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="id_no"
-                        />
-                        {errors.id_no && <Text style={styles.errorText}>This field is required!</Text>}
+            <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+                <View style={styles.header}>
+                    <ThemedText type="title" style={{ marginBottom: 10,}}>New Response for {form.name}</ThemedText>
+                    <ThemedText>{questions.length + 11} questions (max)</ThemedText>
+                </View>
 
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="Respondent First Name"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="fname"
-                        />
-                        {errors.fname && <Text>This is required.</Text>}
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="Respondent Surname"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="lname"
-                        />
-                        {errors.lname && <Text style={styles.errorText}>This field is required!</Text>}
+                <View style={styles.block}>
+                    <ThemedText type="subtitle" style={{marginBottom: 20}}>Respondent Information</ThemedText>
 
-                        <Controller control={control} rules={{ required: true, pattern: /^\d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])$/ }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="yyyy-mm-dd"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="dob"
+                    <ThemedText>Respondent ID/Passport Number</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="ID or Passport Number"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.dob && <Text style={styles.errorText}>Please enter a valid date</Text>}
-                        
-                        
-                        <Controller control={control} defaultValue="M" rules={{ required: true }}
-                            render={({ field: { onChange, value } }) => (
-                                <Picker onValueChange={onChange} selectedValue={value}>
-                                    <Picker.Item label="Male" value="M" />
-                                    <Picker.Item label="Female" value="F" />
-                                    <Picker.Item label="Non-Binary" value="NB" />
-                                </Picker>
-                            )}
-                            name="sex"
+                        )}
+                        name="id_no"
+                    />
+                    {errors.id_no && <Text style={styles.errorText}>This field is required!</Text>}
+                    
+                    <ThemedText>Respondent First Name</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="Respondent First Name"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.sex && <Text style={styles.errorText}>Please select an option!</Text>}
+                        )}
+                        name="fname"
+                    />
+                    {errors.fname && <Text>This is required.</Text>}
 
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="Ward"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="ward"
+                    <ThemedText>Respondent Last Name</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="Respondent Surname"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.ward && <Text style={styles.errorText}>This field is required!</Text>}
-
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="Village"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="village"
+                        )}
+                        name="lname"
+                    />
+                    {errors.lname && <Text style={styles.errorText}>This field is required!</Text>}
+                    
+                    <ThemedText>Respondent Date of Birth</ThemedText>
+                    <Controller control={control} rules={{ required: true, pattern: /^\d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])$/ }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="yyyy-mm-dd"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.village && <Text style={styles.errorText}>This field is required!</Text>}
-
-                        <Controller control={control} rules={{ required: true, maxLength: 255 }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="District"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="district"
+                        )}
+                        name="dob"
+                    />
+                    {errors.dob && <Text style={styles.errorText}>Please enter a valid date</Text>}
+                    
+                    <ThemedText>Respondent Sex</ThemedText>
+                    <Controller control={control} defaultValue="M" rules={{ required: true }}
+                        render={({ field: { onChange, value } }) => (
+                            <Picker onValueChange={onChange} selectedValue={value} style={styles.picker}>
+                                <Picker.Item label="Male" value="M" color={theme.colors.darkAccent} />
+                                <Picker.Item label="Female" value="F" color={theme.colors.darkAccent} />
+                                <Picker.Item label="Non-Binary" value="NB" color={theme.colors.darkAccent} />
+                            </Picker>
+                        )}
+                        name="sex"
+                    />
+                    {errors.sex && <Text style={styles.errorText}>Please select an option!</Text>}
+                    
+                    <ThemedText>Respondent Ward</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="Ward"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.district && <Text style={styles.errorText}>This field is required!</Text>}
+                        )}
+                        name="ward"
+                    />
+                    {errors.ward && <Text style={styles.errorText}>This field is required!</Text>}
 
-                        <Controller control={control} rules={{ required: true, maxLength: 255}}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="Citizenship"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="citizenship"
+                    <ThemedText>Respondent Village</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="Village"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.citizenship && <Text style={styles.errorText}>This field is required!</Text>}
-
-                        <Controller control={control} rules={{ maxLength: 255, pattern: /^\S+@\S+$/i  }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="email@website.com"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="email"
+                        )}
+                        name="village"
+                    />
+                    {errors.village && <Text style={styles.errorText}>This field is required!</Text>}
+                    
+                    <ThemedText>Respondent District</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255 }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="District"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.email && <Text style={styles.errorText}>Please enter a valid email address.</Text>}
-
-                        <Controller control={control} rules={{ maxLength: 255, pattern: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/  }}
-                            render={({ field: { onChange, onBlur, value } }) => (
-                            <TextInput
-                                placeholder="+267 71 234 567"
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                            />
-                            )}
-                            name="contact_no"
+                        )}
+                        name="district"
+                    />
+                    {errors.district && <Text style={styles.errorText}>This field is required!</Text>}
+                    
+                    <ThemedText>Respondent Citizenship</ThemedText>
+                    <Controller control={control} rules={{ required: true, maxLength: 255}}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="Citizenship"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
                         />
-                        {errors.contact_no && <Text style={styles.errorText}>Please enter a valid phone number</Text>}
-                    </View>
+                        )}
+                        name="citizenship"
+                    />
+                    {errors.citizenship && <Text style={styles.errorText}>This field is required!</Text>}
+                    
+                    <ThemedText>Respondent Email (Optional)</ThemedText>
+                    <Controller control={control} rules={{ maxLength: 255, pattern: /^\S+@\S+$/i  }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="email@website.com"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
+                        />
+                        )}
+                        name="email"
+                    />
+                    {errors.email && <Text style={styles.errorText}>Please enter a valid email address.</Text>}
+                    
+                    <ThemedText>Respondent Phone Number (Optional)</ThemedText>
+                    <Controller control={control} rules={{ maxLength: 255, pattern: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/  }}
+                        render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                            placeholder="+267 71 234 567"
+                            placeholderTextColor={theme.colors.lightGrey}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value}
+                            style={styles.textInput}
+                        />
+                        )}
+                        name="contact_no"
+                    />
+                    {errors.contact_no && <Text style={styles.errorText}>Please enter a valid phone number</Text>}
+                </View>
 
-                    <View>
-                        <ThemedText type="subtitle">Questions</ThemedText>
-                        {questions.map(question => (
-                            <View key={question.id}>
-                                <Question question={question} />
-                            </View>
-                        ))}
-                    </View>
-                <Button title="Submit" onPress={methods.handleSubmit(onSubmit)} />
+                <View>
+                    <ThemedText type="subtitle" style={{ marginBottom: 20 }}>Form Questions</ThemedText>
+
+                    {questions.map(question => (
+                        <View key={question.id}>
+                            <Question question={question} />
+                        </View>
+                    ))}
+                    {errors.fname && <Text>Please enter a number!.</Text>}
+                </View>
+
+                <ThemedButton text="Submit" onPress={methods.handleSubmit(onSubmit)} />
+                <View style={{ height: 80} }></View>
             </ScrollView>
             </FormProvider>
         )
@@ -602,21 +678,40 @@ export default function NewResponse(){
 }
 
 const styles = StyleSheet.create({
-    options: {
-        flexDirection: 'row'
+    header:{
+        marginBottom: 15,
     },
-  container: {
-    padding: 16,
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 10,
-    padding: 8,
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 10,
-  },
+    options: {
+        left:20,
+        flexDirection: 'row',
+        gap: 10,
+    },
+    block: {
+        padding: 20,
+        backgroundColor: theme.colors.darkAccent,
+        borderRadius: 8,
+        marginBottom: 20,
+    },
+    container: {
+        padding: 20,
+    },
+    textInput: {
+        marginTop: 10,
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        marginBottom: 20,
+        borderRadius: 8,
+        padding: 12,
+        color: theme.colors.lightText,
+    },
+    errorText: {
+        color: 'red',
+        marginBottom: 10,
+    },
+    picker: {
+        borderRadius: 8,
+        backgroundColor: theme.colors.primary,
+        marginBottom: 20,
+    },
 });

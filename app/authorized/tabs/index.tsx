@@ -1,19 +1,17 @@
-import { Image } from 'expo-image';
-import { Alert, Platform, StyleSheet } from 'react-native';
-
-import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { useConnection } from '@/context/ConnectionContext';
 import { getSecureItem } from '@/services/secure-storage-functions';
 import { cleanLocalStorage } from '@/sync-load-queries/clean-local-storage';
 import { syncResponses } from '@/sync-load-queries/sync-responses';
+import theme from '@/themes/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import initDatabase from '../../database/initDB';
 
 export default function HomeScreen() {
     const { isConnected, isServerReachable } = useConnection();
+    const[username, setUsername] = useState(null)
     const router = useRouter();
 
     const [daysLeft, setDaysLeft] = useState(0)
@@ -38,6 +36,15 @@ export default function HomeScreen() {
         );
     }
     useEffect(() => {
+            const getUsername = async() => {
+                const storedCredentials = await getSecureItem('user_credentials')
+                if(storedCredentials){
+                    const cred = JSON.parse(storedCredentials);
+                    const username = cred.username;
+                    setUsername(username);
+                }
+            }
+            getUsername();
             const syncData = async () => {
                 await initDatabase();
                 if(isServerReachable){
@@ -54,42 +61,31 @@ export default function HomeScreen() {
                 offline()
             }
         }, []);
-  return (
-    <ParallaxScrollView
-        headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-        headerImage={
-        <Image
-            source={require('@/assets/images/partial-react-logo.png')}
-            style={styles.reactLogo}
-        />
-        }>
-        <ThemedView style={styles.titleContainer}>
-            <ThemedText type="title">Welcome!</ThemedText>
-        </ThemedView>
-        <ThemedView style={styles.stepContainer}>
-            <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-                <ThemedText>
-                    Edit this to see changes.
-                    Press{' '}
-                    <ThemedText type="defaultSemiBold">
-                        {Platform.select({
-                            ios: 'cmd + d',
-                            android: 'cmd + m',
-                            web: 'F12',
-                        })}
-                    </ThemedText>{' '}
-                    to open developer tools.
-            </ThemedText>
-        </ThemedView>
-    </ParallaxScrollView>
+
+    return (
+        <ScrollView style={styles.container}>
+            <View style={styles.titleContainer} >
+                <ThemedText type="subtitle" >Welcome,</ThemedText>
+                <ThemedText type="title">{username}</ThemedText>
+            </View>
+            <View style={styles.stepContainer}>
+                <ThemedText type="subtitle">Step 1: Try it</ThemedText>
+
+            </View>
+        </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        padding: 30,
+        backgroundColor: theme.colors.darkBackground,
+        flex: 1,
+    },
     titleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: 'column',
         gap: 8,
+        marginBottom: 20,
     },
     stepContainer: {
         gap: 8,

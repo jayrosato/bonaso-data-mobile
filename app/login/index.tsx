@@ -1,15 +1,18 @@
 import LoadingScreen from '@/components/LoadingScreen';
+import ThemedButton from '@/components/ThemedButton';
 import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/context/AuthContext';
 import { useConnection } from '@/context/ConnectionContext';
 import { deleteSecureItem, getSecureItem, saveSecureItem } from '@/services/secure-storage-functions';
+import theme from '@/themes/theme';
 import bcrypt from "bcryptjs";
 import * as ExpoCrypto from 'expo-crypto';
 import { randomUUID } from 'expo-crypto';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, FormProvider, useForm } from "react-hook-form";
-import { Button, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 // Fallback random generator for bcryptjs
 bcrypt.setRandomFallback((len) => {
@@ -124,14 +127,18 @@ export default function Login(){
     const { control, handleSubmit, formState: { errors } } = methods;
     if(loading){return <LoadingScreen />}
     return(
+        <View style={styles.loginPage}>
         <FormProvider {...methods}>
-            <ScrollView style={styles.container}>
-                <ThemedText type="title" style={styles.title}>Login</ThemedText>
+            <Image style={styles.loginImg} source={require('../../assets/images/boansoWhite.png')} />
+            <View style={styles.loginContainer}>
+                <ThemedText type="title" style={styles.title}>Welcome Back!</ThemedText>
                 <ThemedText type="defaultSemiBold">Username</ThemedText>
                 <Controller control={control} rules={{ required: true, maxLength: 255 }}
                     render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                        placeholder="username"
+                        style={styles.input}
+                        placeholder="Type your username here..."
+                        placeholderTextColor={theme.colors.lightText}
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -145,7 +152,9 @@ export default function Login(){
                 <Controller control={control} rules={{ required: true, maxLength: 255 }}
                     render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                        placeholder="password"
+                        style={styles.input}
+                        placeholder="Enter your password here..."
+                        placeholderTextColor={theme.colors.lightText}
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -156,26 +165,40 @@ export default function Login(){
                 />
                 {errors.password && <ThemedText style={styles.errorText}>This field is required!</ThemedText>}
 
-                <Button title="Submit" onPress={methods.handleSubmit(onSubmit)} />
-
+                <ThemedButton text="Submit" onPress={handleSubmit(onSubmit)} />
                 {response && <ThemedText> {response}</ThemedText>}
-            </ScrollView>
+            </View>
         </FormProvider>
+        </View>
     )
 }
 
 const styles = StyleSheet.create({
+    loginPage: {
+        backgroundColor: theme.colors.darkBackground,
+    },
+    loginImg:{
+        position: 'absolute',
+        height: 200,
+        width: 200,
+        top: 100,
+        left: 100,
+    },
     title:{
+        textAlign: 'center',
         height: 50,
         marginBottom: 10,
     },
-    container: {
+    loginContainer: {
+        backgroundColor: theme.colors.darkBackground,
         display: 'flex',
         flexDirection: 'column',
-        top: 200,
+        top: 350,
         margin: 40,
     },
     input: {
+        marginTop: 7,
+        color: 'white',
         height: 40,
         borderColor: 'gray',
         borderWidth: 1,
@@ -183,6 +206,11 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     errorText: {
+        padding: 2,
+        borderWidth: 4,
+        borderStyle: 'solid',
+        borderColor: 'darkred',
+        backgroundColor: 'lightcoral',
         color: 'red',
         marginBottom: 10,
     },

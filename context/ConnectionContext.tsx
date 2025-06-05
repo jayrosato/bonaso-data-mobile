@@ -1,7 +1,7 @@
 import checkServerConnection from "@/services/checkServerConnection";
+import { syncResponses } from "@/sync-load-queries/sync-responses";
 import NetInfo from '@react-native-community/netinfo';
 import { createContext, useContext, useEffect, useState } from "react";
-
 const ConnectionContext = createContext({ isConnected: true, isServerReachable: true })
 
 export const ConnectionTest = ({ children }) => {
@@ -16,7 +16,11 @@ export const ConnectionTest = ({ children }) => {
 
         if (connected) {
             const serverResponse = await checkServerConnection();
+            if(serverResponse){
+                await syncResponses()
+            }
             setIsServerReachable(serverResponse);
+
         } 
         else {
             setIsServerReachable(false);

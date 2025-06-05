@@ -1,15 +1,16 @@
-import ParallaxScrollView from '@/components/ParallaxScrollView';
+import LoadingScreen from '@/components/LoadingScreen';
+import ThemedButton from '@/components/ThemedButton';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { useConnection } from '@/context/ConnectionContext';
 import { getSecureItem } from '@/services/secure-storage-functions';
 import { loadLocalForms } from '@/sync-load-queries/load-local-forms';
 import { syncForms } from '@/sync-load-queries/sync-forms';
-import { Image } from 'expo-image';
+import theme from '@/themes/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, } from 'react';
-import { Button, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import initDatabase from '../../../database/initDB';
+
 export default function FormIndex(){
     const router = useRouter();
     const { isConnected, isServerReachable } = useConnection();
@@ -52,60 +53,64 @@ export default function FormIndex(){
     }
     
     function Forms(){
-        if (loading) return <ThemedText>Loading...</ThemedText>;
         if (!forms || forms.length === 0) return <ThemedText>No forms yet!</ThemedText>;
         if(forms.length > 0){
             return(
-                <ThemedView>
+                <View>
                     {forms.map((form) => (
-                        <ThemedView key={form.id} style={styles.stepContainer}>
-                                <ThemedText type="subtitle">{form.form_name}</ThemedText>
-                                <ThemedText type="defaultSemiBold">From {form.organization_name}</ThemedText>
-                                <ThemedText>Open from {form.start_date} to {form.end_date}</ThemedText>
-                            <Button title="View Form" onPress={() => goToForm(form)}/>
-                            <Button title="New Response" onPress={() => goToResponse(form)}/>
-                        </ThemedView>
+                        <View key={form.id} style={styles.formContainer}>
+                            <ThemedText type="subtitle">{form.form_name}</ThemedText>
+                            <ThemedText type="defaultSemiBold">From {form.organization_name}</ThemedText>
+                            <ThemedText>Open from {form.start_date} to {form.end_date}</ThemedText>
+                            <View style={styles.actions}>
+                                <ThemedButton text="New Response" onPress={() => goToResponse(form)} style={styles.respond} />
+                                <ThemedButton text="View Details" onPress={() => goToForm(form)} style={styles.view}/>
+                            </View>
+                        </View>
                     ))}
-                </ThemedView>
+                </View>
             )
         }
     }
 
-
+    if(loading){ return <LoadingScreen /> }
     return(
-        <ParallaxScrollView
-            headerBackgroundColor = {{ light: '#A1CEDC', dark: '#1D3D47' }}
-            headerImage={
-                <Image
-                    source={require('@/assets/images/partial-react-logo.png')}
-                    style={styles.reactLogo}
-                />
-            }>
-            <ThemedView style={styles.titleContainer}>
+        <ScrollView style={styles.container}>
+            <View style={styles.titleContainer}>
                 <ThemedText type="title">Your Forms</ThemedText>
-            </ThemedView>
-            <ThemedView>
+            </View>
+            <View>
                 <Forms />
-            </ThemedView>
-        </ParallaxScrollView>
+            </View>
+        </ScrollView>
     )
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+    container:{
+        padding: 20,
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 30,
+    },
+    formContainer: {
+        borderRadius: 8,
+        padding: 20,
+        gap: 8,
+        marginBottom: 8,
+        backgroundColor: theme.colors.darkAccent
+    },
+    actions:{
+        flexDirection:'row',
+    },
+    view:{
+        width: 115,
+        left: 20,
+    },
+    respond:{
+        width: 200,
+    }
 });

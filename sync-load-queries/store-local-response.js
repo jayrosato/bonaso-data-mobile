@@ -39,8 +39,8 @@ export const storeResponseLocally = async (data) => {
             VALUES (?, ?, ?, ?)`
         //hope this works
         const questions = Object.fromEntries(Object.entries(respInfo).filter(([key]) => Number.isInteger(Number(key))));
-        console.log('questions', questions)
         for(const [qID, answers] of Object.entries(questions)) {
+            console.log('answers', answers)
             const question = parseInt(qID)
             if(Array.isArray(answers)){
                 if(answers.length === 0){
@@ -56,7 +56,8 @@ export const storeResponseLocally = async (data) => {
                     await queryWriter(answerQuery, [responseID, question, null, answers[0]])
                 }
             }
-            else if(!answers === null){ //text/number, record value directly
+            else if(answers){ //text/number, record value directly
+                console.log(answers)
                 await queryWriter(answerQuery, [responseID, question, null, answers])
             }
         }

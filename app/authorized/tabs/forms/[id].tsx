@@ -1,12 +1,10 @@
 import { loadLocalByID, loadLocalFromArray } from '@/app/database/queryWriter';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
+import LoadingScreen from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { Image } from 'expo-image';
+import theme from '@/themes/theme';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-
+import { ScrollView, StyleSheet, View } from 'react-native';
 export default function FormDetail(){
     const { id } = useLocalSearchParams();
     const [form, setForm] = useState({
@@ -147,69 +145,69 @@ export default function FormDetail(){
     function Question( { question } ){
         if(question.options.length>0){
             console.log(question.options)
+
             function Options(){
                 return(
-                    <ThemedView style={styles.stepContainer}>
-                        {question.options.map(o =>(
-                            <ThemedText key={o.id}>{o.text}</ThemedText>
+                    <View style={styles.optionContainer}>
+                        {question.options.map((o, index) =>(
+                            <ThemedText key={o.id}>{index+1}. {o.text}</ThemedText>
                         ))}
-                    </ThemedView>
+                    </View>
                 )
             }
+            
             return(
-                <ThemedView key={form.id} style={styles.stepContainer}>
+                <View key={form.id} style={styles.questionContainer}>
                     <ThemedText type="subtitle">{question.index +1}. {question.text}</ThemedText>
                     <ThemedText type="defaultSemiBold">{question.type}</ThemedText>
-                    < Options />
-                </ThemedView>
+                    <Options />
+                </View>
             );
         }
         else{
             return(
-                <ThemedView key={form.id} style={styles.stepContainer}>
+                <View key={form.id} style={styles.questionContainer}>
                     <ThemedText type="subtitle">{question.text}</ThemedText>
                     <ThemedText type="defaultSemiBold">{question.type}</ThemedText>
-                </ThemedView>
+                </View>
             );
         };
     }
 
-    if (loading) return <ThemedText>Loading...</ThemedText>;
+    if(loading){ return <LoadingScreen /> }
     if (!form.questions || form.questions.length === 0) return <ThemedText>This form has no questions.</ThemedText>;
     if(form.questions.length > 0){
         return(
-            <ParallaxScrollView
-                headerBackgroundColor = {{ light: '#A1CEDC', dark: '#1D3D47' }}
-                headerImage={
-                    <Image
-                        source={require('@/assets/images/partial-react-logo.png')}
-                        style={styles.reactLogo}
-                    />
-                }>
+            <ScrollView style={styles.container}>
 
-                <ThemedView style={styles.titleContainer}>
+                <View style={styles.titleContainer}>
                     <ThemedText type="title">{form.name}</ThemedText>
-                </ThemedView>
-
-                <ThemedView style={styles.titleContainer}>
                     <ThemedText type="subtitle">From {form.organization.name}</ThemedText>
-                </ThemedView>
+                </View>
 
-                <ThemedView style={styles.titleContainer}>
+                <View style={styles.titleContainer}>
                     {form.questions.map(q => <Question key={q.id} question={q} />)}
-                </ThemedView>
-            </ParallaxScrollView>
+                </View>
+                <View style={{ height: 40 }} />
+            </ScrollView>
         )
     }
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
+    container: {
+        padding: 30,
+    },
+    titleContainer: {
+        marginBottom: 20,
+    },
+    optionContainer: {
+        left: 30,
+    },
+  questionContainer: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: theme.colors.darkAccent,
     gap: 8,
     marginBottom: 8,
     flexDirection:'column',

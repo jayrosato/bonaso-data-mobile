@@ -1,15 +1,13 @@
+import HeaderInfo from '@/components/HeaderInfo';
 import { useAuth } from '@/context/AuthContext';
 import { useConnection } from '@/context/ConnectionContext';
-import { InactivityProvider } from '@/context/InactivityContext';
 import { getSecureItem } from '@/services/secure-storage-functions';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Button, Text } from 'react-native';
+
 export default function Layout() {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, isLoading, signOut } = useAuth();
     const { isConnected, isServerReachable } = useConnection();
-    const { signOut } = useAuth();
     const[username, setUsername] = useState(null)
     const [accessLevel, setAccessLevel] = useState(null)
 
@@ -32,23 +30,15 @@ export default function Layout() {
     }
     
     return (
-        <InactivityProvider onTimeout={signOut}>
+        
             <Stack
                 screenOptions={{
-                headerStyle: { backgroundColor: '#fff' },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: 'bold' },
-                headerTitle: () => <Text>Welcome, {accessLevel} {username}!</Text>,
-                headerLeft: () => <>
-                        <Ionicons name={"wifi"} color={isServerReachable ? 'green' : 'grey'}/>
-                        {isServerReachable ? 
-                        <Text>You are online!</Text>:<Text>You are operating offline.</Text>
-                    }
-                    </>,
-                headerRight: () => <Button onPress={() => signOut()} title="Log Out" />
+                header: () => (
+                <HeaderInfo username={username} connected={isServerReachable} />
+                ),
             }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             </Stack>
-        </InactivityProvider>
+
     );
 }
